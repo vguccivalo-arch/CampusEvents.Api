@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using CampusEvents.Api.Models;
 using CampusEvents.Api.Data;
+using CampusEvents.Api.DTOs;
 namespace CampusEvents.Api.Controller;
 
 [ApiController]
@@ -15,15 +17,34 @@ public class SpeakersController : ControllerBase
         _context = context;
     }
     [HttpGet]
-    public ActionResult<IEnumerable<CampusSpeaker>> GetSpeakers()
+    public async Task<ActionResult<PaginatedResponse<CampusSpeaker>>> GetSpeakers
+    (
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10
+    )
     {
-        var speakers = _context.Speakers.ToList();
-        return Ok(speakers);
+        var query = _context.Speakers.AsNoTracking();
+        var totalCount = await query.CountAsync();
+        var speakers = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var response = new PaginatedResponse<CampusSpeaker>
+        {
+            Page = page,
+            TotalCount = totalCount,
+            PageSize = pageSize,
+            CurrentPage = page,
+            Items = speakers
+        };
+
+        return Ok(response);
     }
     [HttpGet("{id}")]
-    public ActionResult<CampusSpeaker> GetSpeakerById(int id)
+    public async Task<ActionResult<CampusSpeaker>> GetSpeakerById(int id)
     {
-        var campspeaker = _context.Speakers.FirstOrDefault(s => s.Id == id);
+        var campspeaker = await _context.Speakers.FirstOrDefaultAsync(s => s.Id == id);
 
         if (campspeaker == null)
         {
@@ -32,7 +53,7 @@ public class SpeakersController : ControllerBase
         return Ok(campspeaker);
     }
     [HttpPost]
-    public ActionResult<CampusSpeaker> CreateSpeaker(speakerCreateDDto speaker)
+    public async Task<ActionResult<CampusSpeaker>> CreateSpeaker(speakerCreateDDto speaker)
     {
         var speakerModel = new CampusSpeaker
         {
@@ -41,13 +62,13 @@ public class SpeakersController : ControllerBase
             Email = speaker.Email
         };
         _context.Speakers.Add(speakerModel);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
         return CreatedAtAction(nameof(GetSpeakers), new { id = speakerModel.Id }, speakerModel);
     }
     [HttpPut("{id}")]
-    public ActionResult UpdateSpeaker(int id, [FromBody] CampusSpeaker updatedSpeaker)
+    public async Task<ActionResult> UpdateSpeaker(int id, [FromBody] CampusSpeaker updatedSpeaker)
     {
-        var existingSpeaker = _context.Speakers.FirstOrDefault(s => s.Id == id);
+        var existingSpeaker = await _context.Speakers.FirstOrDefaultAsync(s => s.Id == id);
 
         if (existingSpeaker == null)
         {
@@ -58,14 +79,14 @@ public class SpeakersController : ControllerBase
         existingSpeaker.Bio = updatedSpeaker.Bio;
         existingSpeaker.Email = updatedSpeaker.Email;
 
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }
     [HttpDelete("{id}")]
-    public ActionResult DeleteSpeaker(int id)
+    public async Task<ActionResult> DeleteSpeaker(int id)
     {
-        var existingSpeaker = _context.Speakers.FirstOrDefault(s => s.Id == id);
+        var existingSpeaker = await _context.Speakers.FirstOrDefaultAsync(s => s.Id == id);
 
         if (existingSpeaker == null)
         {
@@ -73,7 +94,7 @@ public class SpeakersController : ControllerBase
         }
 
         _context.Speakers.Remove(existingSpeaker);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using CampusEvents.Api.Models;
 using CampusEvents.Api.Data;
+using CampusEvents.Api.DTOs;
 
 namespace CampusEvents.Api.Controllers;
 
@@ -16,16 +18,34 @@ public class AttendantsController : ControllerBase
         _context = context;
     }
     [HttpGet]
-    public ActionResult<IEnumerable<Attendant>> GetAttendants()
+    public async Task<ActionResult<PaginatedResponse<Attendant>>> GetAttendants
+    (
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10
+    )
     {
-        var _attendants = _context.Attendants.ToList();
-        return Ok(_attendants);
+        var query = _context.Attendants.AsNoTracking();
+        var totalCount = await query.CountAsync();
+        var attendants = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
 
+        var response = new PaginatedResponse<Attendant>
+        {
+            Page = page,
+            TotalCount = totalCount,
+            PageSize = pageSize,
+            CurrentPage = page,
+            Items = attendants
+        };
+
+        return Ok(response);
     }
     [HttpGet("{id}")]
-    public ActionResult<Attendant> GetAttendantById(int id)
+    public async Task<ActionResult<Attendant>> GetAttendantById(int id)
     {
-        var attendant = _context.Attendants.FirstOrDefault(a => a.Id == id);
+        var attendant = await _context.Attendants.FirstOrDefaultAsync(a => a.Id == id);
 
         if (attendant == null)
         {
@@ -34,7 +54,7 @@ public class AttendantsController : ControllerBase
         return Ok(attendant);
     }
     [HttpPost]
-    public ActionResult<Attendant> CreateAttendant(AttendantCreateDDto attendant)
+    public async Task<ActionResult<Attendant>> CreateAttendant(AttendantCreateDDto attendant)
     {
         var attendantModel = new Attendant
         {
@@ -42,13 +62,13 @@ public class AttendantsController : ControllerBase
             Email = attendant.Email
         };
         _context.Attendants.Add(attendantModel);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
         return CreatedAtAction(nameof(GetAttendants), new { id = attendantModel.Id }, attendantModel);
     }
     [HttpPut("{id}")]
-    public ActionResult UpdateAttendant(int id, [FromBody] Attendant updatedAttendant)
+    public async Task<ActionResult> UpdateAttendant(int id, [FromBody] Attendant updatedAttendant)
     {
-        var existingAttendant = _context.Attendants.FirstOrDefault(a => a.Id == id);
+        var existingAttendant = await _context.Attendants.FirstOrDefaultAsync(a => a.Id == id);
 
         if (existingAttendant == null)
         {
@@ -58,14 +78,14 @@ public class AttendantsController : ControllerBase
         existingAttendant.Name = updatedAttendant.Name;
         existingAttendant.Email = updatedAttendant.Email;
 
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }
     [HttpDelete("{id}")]
-    public ActionResult DeleteAttendant(int id)
+    public async Task<ActionResult> DeleteAttendant(int id)
     {
-        var existingAttendant = _context.Attendants.FirstOrDefault(a => a.Id == id);
+        var existingAttendant = await _context.Attendants.FirstOrDefaultAsync(a => a.Id == id);
 
         if (existingAttendant == null)
         {
@@ -73,7 +93,7 @@ public class AttendantsController : ControllerBase
         }
 
         _context.Attendants.Remove(existingAttendant);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }

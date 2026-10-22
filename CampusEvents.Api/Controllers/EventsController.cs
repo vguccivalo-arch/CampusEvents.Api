@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using CampusEvents.Api.Models;
 using CampusEvents.Api.Data;
+using CampusEvents.Api.DTOs;
 
 namespace CampusEvents.Api.Controllers;
 
@@ -18,15 +20,46 @@ public class EventsController : ControllerBase
 
 
     [HttpGet]
-    public ActionResult<IEnumerable<CampusEvent>> GetEvents()
+    public async Task<ActionResult<PaginatedResponse<CampusEvent>>> GetEvents
+    (
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null
+
+    )
     {
-        var events = _context.Events.ToList();
-        return Ok(events);
+        var query = _context.Events.AsNoTracking();
+        if (startDate.HasValue)
+        {
+            query = query.Where(e => e.Date >= startDate.Value);
+        }
+        if (endDate.HasValue)
+        {
+            query = query.Where(e => e.Date <= endDate.Value);
+        }
+        var totalCount = await _context.Events.CountAsync();
+        var events = await _context.Events
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var response = new PaginatedResponse<CampusEvent>
+        {
+            Page = page,
+            TotalCount = totalCount,
+            PageSize = pageSize,
+            CurrentPage = page,
+            Items = events
+        };
+
+        return Ok(response);
     }
+
     [HttpGet("{id}")]
-    public ActionResult<CampusEvent> GetEventById(int id)
+    public async Task<ActionResult<CampusEvent>> GetEventById(int id)
     {
-        var campusevent = _context.Events.FirstOrDefault(e => e.Id == id);
+        var campusevent = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
 
         if (campusevent == null)
         {
@@ -35,7 +68,7 @@ public class EventsController : ControllerBase
         return Ok(campusevent);
     }
     [HttpPost]
-    public ActionResult<CampusEvent> CreateEvent(EventCreateDto campusEvent)
+    public async Task<ActionResult<CampusEvent>> CreateEvent(EventCreateDto campusEvent)
     {
         var eventModel = new CampusEvent
         {
@@ -45,15 +78,15 @@ public class EventsController : ControllerBase
             Location = campusEvent.Location
         };
         _context.Events.Add(eventModel);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
         return CreatedAtAction(nameof(GetEvents), new { id = eventModel.Id }, eventModel);
     }
 
     [HttpPut("{id}")]
-    public ActionResult UpdateEvent(int id, [FromBody] CampusEvent updatedEvent)
+    public async Task<ActionResult> UpdateEvent(int id, [FromBody] CampusEvent updatedEvent)
     {
 
-        var existingEvent = _context.Events.FirstOrDefault(e => e.Id == id);
+        var existingEvent = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
 
 
         if (existingEvent == null)
@@ -65,12 +98,13 @@ public class EventsController : ControllerBase
         existingEvent.Date = updatedEvent.Date;
         existingEvent.Location = updatedEvent.Location;
 
+        await _context.SaveChangesAsync();
         return NoContent();
     }
     [HttpDelete("{id}")]
-    public ActionResult DeleteEvent(int id)
+    public async Task<ActionResult> DeleteEvent(int id)
     {
-        var existingEvent = _context.Events.FirstOrDefault(e => e.Id == id);
+        var existingEvent = await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
 
         if (existingEvent == null)
         {
@@ -78,7 +112,7 @@ public class EventsController : ControllerBase
         }
 
         _context.Events.Remove(existingEvent);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }

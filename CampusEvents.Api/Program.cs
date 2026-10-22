@@ -1,6 +1,9 @@
+using CampusEvents.Api.Middlewares;
 using CampusEvents.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,10 +37,12 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
+app.UseMiddleware<ApiKeyMiddleware>();
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+app.UseAuthentication();
+
 
 app.MapControllers();
 

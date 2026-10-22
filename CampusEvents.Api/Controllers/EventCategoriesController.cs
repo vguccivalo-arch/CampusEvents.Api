@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using CampusEvents.Api.Models;
 using CampusEvents.Api.Data;
+using CampusEvents.Api.DTOs;
 namespace CampusEvents.Api.Controllers;
 
 [ApiController]
@@ -15,15 +17,34 @@ public class EventCategoriesController : ControllerBase
         _context = context;
     }
     [HttpGet]
-    public ActionResult<IEnumerable<EventCategory>> GetEventCategories()
+    public async Task<ActionResult<PaginatedResponse<EventCategory>>> GetEventCategories
+    (
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10
+    )
     {
-        var _eventcategories = _context.EventCategories.ToList();
-        return Ok(_eventcategories);
+        var query = _context.EventCategories.AsNoTracking();
+        var totalCount = await query.CountAsync();
+        var eventCategories = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var response = new PaginatedResponse<EventCategory>
+        {
+            Page = page,
+            TotalCount = totalCount,
+            PageSize = pageSize,
+            CurrentPage = page,
+            Items = eventCategories
+        };
+
+        return Ok(response);
     }
     [HttpGet("{id}")]
-    public ActionResult<EventCategory> GetEventCategoryById(int id)
+    public async Task<ActionResult<EventCategory>> GetEventCategoryById(int id)
     {
-        var eventCategory = _context.EventCategories.FirstOrDefault(ec => ec.Id == id);
+        var eventCategory = await _context.EventCategories.FirstOrDefaultAsync(ec => ec.Id == id);
 
         if (eventCategory == null)
         {
@@ -32,20 +53,20 @@ public class EventCategoriesController : ControllerBase
         return Ok(eventCategory);
     }
     [HttpPost]
-    public ActionResult<EventCategory> CreateEventCategory(EventCategoryCreateDDto eventCategory)
+    public async Task<ActionResult<EventCategory>> CreateEventCategory(EventCategoryCreateDDto eventCategory)
     {
         var eventCategoryModel = new EventCategory
         {
             Name = eventCategory.Name
         };
         _context.EventCategories.Add(eventCategoryModel);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
         return CreatedAtAction(nameof(GetEventCategories), new { id = eventCategoryModel.Id }, eventCategoryModel);
     }
     [HttpPut("{id}")]
-    public ActionResult UpdateEventCategory(int id, [FromBody] EventCategory updatedEventCategory)
+    public async Task<ActionResult> UpdateEventCategory(int id, [FromBody] EventCategory updatedEventCategory)
     {
-        var existingEventCategory = _context.EventCategories.FirstOrDefault(ec => ec.Id == id);
+        var existingEventCategory = await _context.EventCategories.FirstOrDefaultAsync(ec => ec.Id == id);
 
         if (existingEventCategory == null)
         {
@@ -54,14 +75,14 @@ public class EventCategoriesController : ControllerBase
 
         existingEventCategory.Name = updatedEventCategory.Name;
 
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }
     [HttpDelete("{id}")]
-    public ActionResult DeleteEventCategory(int id)
+    public async Task<ActionResult> DeleteEventCategory(int id)
     {
-        var existingEventCategory = _context.EventCategories.FirstOrDefault(ec => ec.Id == id);
+        var existingEventCategory = await _context.EventCategories.FirstOrDefaultAsync(ec => ec.Id == id);
 
         if (existingEventCategory == null)
         {
@@ -69,7 +90,7 @@ public class EventCategoriesController : ControllerBase
         }
 
         _context.EventCategories.Remove(existingEventCategory);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }
